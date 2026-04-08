@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iris Flower Classifier</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 2rem; margin-bottom: .25rem; }
+    header p  { opacity: .85; font-size: .95rem; }
+
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: .5rem;
+    }
+
+    /* Model selector */
+    select {
+      width: 100%;
+      padding: .6rem .9rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: .95rem;
+      background: #f7fafc;
+      color: #2d3748;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+    select:focus { outline: none; border-color: #667eea; }
+
+    /* Sliders */
+    .slider-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 550px) { .slider-grid { grid-template-columns: 1fr; } }
+
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: .88rem;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: .4rem;
+    }
+    .slider-group label span {
+      font-weight: 700;
+      color: #667eea;
+    }
+    input[type=range] {
+      width: 100%;
+      accent-color: #667eea;
+      cursor: pointer;
+    }
+    .slider-limits {
+      display: flex;
+      justify-content: space-between;
+      font-size: .75rem;
+      color: #a0aec0;
+      margin-top: .2rem;
+    }
+
+    /* Predict button */
+    button#predictBtn {
+      width: 100%;
+      padding: .85rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    button#predictBtn:hover   { opacity: .92; }
+    button#predictBtn:active  { transform: scale(.98); }
+    button#predictBtn:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Result */
+    #result { display: none; }
+
+    .prediction-badge {
+      display: inline-block;
+      padding: .5rem 1.5rem;
+      border-radius: 999px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      margin-bottom: 1rem;
+    }
+
+    .accuracy-chip {
+      display: inline-block;
+      background: #ebf4ff;
+      color: #3182ce;
+      padding: .25rem .75rem;
+      border-radius: 999px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+
+    /* Probability bars */
+    .prob-bars { margin-top: 1rem; }
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      margin-bottom: .65rem;
+    }
+    .prob-label { width: 90px; font-size: .85rem; font-weight: 500; color: #4a5568; }
+    .prob-track {
+      flex: 1;
+      height: 14px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .prob-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 999px;
+      transition: width .5s ease;
+    }
+    .prob-pct { width: 42px; text-align: right; font-size: .82rem; color: #718096; }
+
+    /* Confusion matrix */
+    #cm-img { max-width: 100%; border-radius: 8px; margin-top: .5rem; }
+
+    /* Compare table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+    th {
+      text-align: left;
+      padding: .6rem .75rem;
+      background: #edf2f7;
+      color: #4a5568;
+      font-weight: 600;
+    }
+    td { padding: .6rem .75rem; border-top: 1px solid #e2e8f0; }
+    tr:hover td { background: #f7fafc; }
+    .acc-cell { font-weight: 700; color: #3182ce; }
+
+    summary { cursor: pointer; font-weight: 600; color: #667eea; user-select: none; }
+    details[open] summary { margin-bottom: .75rem; }
+    #compare-spinner { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌸 Iris Flower Classifier</h1>
+  <p>Adjust the measurements and pick a classifier to get an instant prediction.</p>
+</header>
+
+<main>
+
+  <!-- Model selector -->
+  <div class="card">
+    <h2>Classifier</h2>
+    <select id="modelSelect">
+      {% for name in model_names %}
+        <option value="{{ name }}">{{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Sliders -->
+  <div class="card">
+    <h2>Flower Measurements</h2>
+    <div class="slider-grid">
+
+      <div class="slider-group">
+        <label>Sepal Length (cm) <span id="sl-val">5.8</span></label>
+        <input type="range" id="sepal_length" min="4.0" max="8.0" step="0.1" value="5.8"
+               oninput="document.getElementById('sl-val').textContent=this.value">
+        <div class="slider-limits"><span>4.0</span><span>8.0</span></div>
+      </div>
+
+      <div class="slider-group">
+        <label>Sepal Width (cm) <span id="sw-val">3.0</span></label>
+        <input type="range" id="sepal_width" min="2.0" max="4.5" step="0.1" value="3.0"
+               oninput="document.getElementById('sw-val').textContent=this.value">
+        <div class="slider-limits"><span>2.0</span><span>4.5</span></div>
+      </div>
+
+      <div class="slider-group">
+        <label>Petal Length (cm) <span id="pl-val">3.7</span></label>
+        <input type="range" id="petal_length" min="1.0" max="7.0" step="0.1" value="3.7"
+               oninput="document.getElementById('pl-val').textContent=this.value">
+        <div class="slider-limits"><span>1.0</span><span>7.0</span></div>
+      </div>
+
+      <div class="slider-group">
+        <label>Petal Width (cm) <span id="pw-val">1.2</span></label>
+        <input type="range" id="petal_width" min="0.1" max="2.5" step="0.1" value="1.2"
+               oninput="document.getElementById('pw-val').textContent=this.value">
+        <div class="slider-limits"><span>0.1</span><span>2.5</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Predict button -->
+  <button id="predictBtn" onclick="predict()">Predict Species</button>
+
+  <!-- Results -->
+  <div class="card" id="result">
+    <h2>Prediction</h2>
+    <div class="prediction-badge" id="pred-label"></div>
+    <div style="margin-bottom:.75rem">
+      Test accuracy: <span class="accuracy-chip" id="acc-label"></span>
+    </div>
+
+    <div class="prob-bars" id="prob-bars"></div>
+  </div>
+
+  <div class="card" id="cm-card" style="display:none">
+    <h2>Confusion Matrix</h2>
+    <img id="cm-img" alt="Confusion matrix" />
+  </div>
+
+  <!-- Compare all models -->
+  <div class="card">
+    <details>
+      <summary>Compare all models</summary>
+      <span id="compare-spinner">Loading…</span>
+      <table id="compare-table" style="display:none">
+        <thead><tr><th>Model</th><th>Accuracy</th></tr></thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+    </details>
+  </div>
+
+</main>
+
+<script>
+  async function predict() {
+    const btn = document.getElementById('predictBtn');
+    btn.disabled = true;
+    btn.textContent = 'Predicting…';
+
+    const payload = {
+      model:        document.getElementById('modelSelect').value,
+      sepal_length: document.getElementById('sepal_length').value,
+      sepal_width:  document.getElementById('sepal_width').value,
+      petal_length: document.getElementById('petal_length').value,
+      petal_width:  document.getElementById('petal_width').value,
+    };
+
+    try {
+      const res  = await fetch('/predict', {
+        method:  'POST',
+        headers: {'Content-Type': 'application/json'},
+        body:    JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      // Prediction label
+      document.getElementById('pred-label').textContent = data.prediction;
+      document.getElementById('acc-label').textContent   = data.accuracy;
+
+      // Probability bars
+      const barsEl = document.getElementById('prob-bars');
+      barsEl.innerHTML = '';
+      for (const [species, prob] of Object.entries(data.probabilities)) {
+        const pct = (prob * 100).toFixed(1);
+        barsEl.innerHTML += `
+          <div class="prob-row">
+            <div class="prob-label">${species}</div>
+            <div class="prob-track">
+              <div class="prob-fill" style="width:${pct}%"></div>
+            </div>
+            <div class="prob-pct">${pct}%</div>
+          </div>`;
+      }
+
+      // Confusion matrix
+      document.getElementById('cm-img').src = 'data:image/png;base64,' + data.confusion_matrix;
+      document.getElementById('cm-card').style.display = 'block';
+
+      // Show results
+      document.getElementById('result').style.display = 'block';
+    } catch (err) {
+      alert('Prediction failed: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Predict Species';
+    }
+  }
+
+  // Load comparison table when details opens
+  document.querySelector('details').addEventListener('toggle', async function() {
+    if (!this.open) return;
+    const spinner = document.getElementById('compare-spinner');
+    const table   = document.getElementById('compare-table');
+    if (table.style.display === 'table') return; // already loaded
+
+    spinner.style.display = 'inline';
+    try {
+      const res  = await fetch('/compare');
+      const rows = await res.json();
+      const tbody = document.getElementById('compare-body');
+      tbody.innerHTML = rows
+        .map(r => `<tr><td>${r.model}</td><td class="acc-cell">${r.accuracy}</td></tr>`)
+        .join('');
+      table.style.display = 'table';
+    } finally {
+      spinner.style.display = 'none';
+    }
+  });
+</script>
+
+</body>
+</html>
